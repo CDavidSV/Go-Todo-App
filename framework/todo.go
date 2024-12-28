@@ -1,12 +1,16 @@
 package framework
 
 import (
+	"bytes"
+	"compress/gzip"
 	"encoding/csv"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/CDavidSV/go-todo-app/config"
@@ -25,7 +29,7 @@ type TodoList struct {
 	tasks map[int]*Task
 }
 
-var defaultFilePath = "taskdata.csv"
+var defaultFilePath = "taskdata"
 
 func parseCSVTaskRecord(record []string, destination *Task) error {
 	if len(record) != 6 {
@@ -68,10 +72,6 @@ func FormatTaskForTable(task Task) []string {
 	return []string{strconv.Itoa(task.ID), task.Title, task.Description, task.CreationDate.Format("02 Jan 06 15:04"), task.Category, completedSymbol}
 }
 
-func FormatTaskForCSV(task Task) []string {
-	return []string{strconv.Itoa(task.ID), task.Title, task.Description, task.CreationDate.Format(time.RFC822), task.Category, strconv.FormatBool(task.Completed)}
-}
-
 func sortTasksByDate(tasks [][]string) {
 	sort.Slice(tasks, func(i, j int) bool {
 		timeI, _ := time.Parse("02 Jan 06 15:04", tasks[i][3])
@@ -84,20 +84,52 @@ func sortTasksByDate(tasks [][]string) {
 	})
 }
 
+func compressString(input string) ([]byte, error) {
+	var gzipBuff bytes.Buffer
+	gzipWriter := gzip.NewWriter(&gzipBuff)
+
+	_, err := gzipWriter.Write([]byte(input))
+	if err != nil {
+		return nil, err
+	}
+	gzipWriter.Close()
+
+	return gzipBuff.Bytes(), nil
+}
+
+func decompressString(input []byte) (string, error) {
+	bytesBuffer := bytes.NewReader(input)
+	gzipReader, err := gzip.NewReader(bytesBuffer)
+	if err != nil {
+		return "", err
+	}
+
+	out, err := io.ReadAll(gzipReader)
+	if err != nil {
+		return "", err
+	}
+
+	return string(out), nil
+}
+
 func NewTodoList() *TodoList {
 	todoList := &TodoList{
 		tasks: make(map[int]*Task),
 	}
 
-	file, err := os.Open(defaultFilePath)
+	fileBytes, err := os.ReadFile(defaultFilePath)
 	if err != nil {
 		// File does not exists or cannot be read
 		return todoList
 	}
-	defer file.Close()
+
+	text, err := decompressString(fileBytes)
+	if err != nil {
+		log.Fatalf(config.ErrorSytle.Render("Error loading tasks, file may be corrupted: %v"), err)
+	}
 
 	// Load tasks from file
-	reader := csv.NewReader(file)
+	reader := csv.NewReader(strings.NewReader(text))
 	records, err := reader.ReadAll()
 
 	// If the length of the records is less than 1, then the file is empty
@@ -185,34 +217,30 @@ func (t *TodoList) ListTasks(category string, showCompleted bool) [][]string {
 	return tasks
 }
 
-func (t *TodoList) convertTasksToCSVFormat() [][]string {
-	tasks := make([][]string, len(t.tasks))
+func (t *TodoList) convertTasksToCSVFormat() string {
+	tasksString := ""
 
-	i := 0
 	for _, task := range t.tasks {
-		formatedTask := FormatTaskForCSV(*task)
-
-		tasks[i] = formatedTask
-		i++
+		tasksString += fmt.Sprintf("%d,%s,%s,%s,%s,%t\n", task.ID, task.Title, task.Description, task.CreationDate.Format(time.RFC822), task.Category, task.Completed)
 	}
 
-	return tasks
+	return tasksString
 }
 
 func (t *TodoList) save() {
 	tasks := t.convertTasksToCSVFormat()
 
-	tempFilePath := defaultFilePath + ".tmp"
-	file, err := os.Create(tempFilePath)
+	compressed, err := compressString(tasks)
+	if err != nil {
+		log.Fatalf(config.ErrorSytle.Render("error saving to file: %v"), err)
+	}
 
-	writer := csv.NewWriter(file)
-	err = writer.WriteAll(tasks)
+	tempFilePath := defaultFilePath + ".tmp"
+	err = os.WriteFile(tempFilePath, compressed, 0644)
 	if err != nil {
 		os.Remove(tempFilePath)
 		log.Fatalf(config.ErrorSytle.Render("error saving to file: %v"), err)
 	}
-
-	file.Close()
 
 	err = os.Rename(tempFilePath, defaultFilePath)
 	if err != nil {
