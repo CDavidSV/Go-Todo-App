@@ -3,6 +3,7 @@ package framework
 import (
 	"encoding/csv"
 	"fmt"
+	"log"
 	"os"
 	"sort"
 	"strconv"
@@ -199,17 +200,23 @@ func (t *TodoList) convertTasksToCSVFormat() [][]string {
 }
 
 func (t *TodoList) save() {
-	file, err := os.Create(defaultFilePath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, config.ErrorSytle.Render("Error creating file: %v\n"), err)
-	}
-	defer file.Close()
-
 	tasks := t.convertTasksToCSVFormat()
+
+	tempFilePath := defaultFilePath + ".tmp"
+	file, err := os.Create(tempFilePath)
 
 	writer := csv.NewWriter(file)
 	err = writer.WriteAll(tasks)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, config.ErrorSytle.Render("Error writing to file: %v\n"), err)
+		os.Remove(tempFilePath)
+		log.Fatalf(config.ErrorSytle.Render("error saving to file: %v"), err)
+	}
+
+	file.Close()
+
+	err = os.Rename(tempFilePath, defaultFilePath)
+	if err != nil {
+		os.Remove(tempFilePath)
+		log.Fatalf(config.ErrorSytle.Render("error saving to file: %v"), err)
 	}
 }
