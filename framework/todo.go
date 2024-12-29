@@ -192,6 +192,14 @@ func (t *TodoList) SetTaskCompletion(ID int, completed bool) bool {
 	return false
 }
 
+func (t *TodoList) CompleteAllTasks() {
+	defer t.save()
+
+	for _, task := range t.tasks {
+		task.Completed = true
+	}
+}
+
 func (t *TodoList) ListAllTasks(completed bool) [][]string {
 	return t.ListTasks("", completed)
 }

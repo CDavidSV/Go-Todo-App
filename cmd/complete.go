@@ -16,6 +16,14 @@ var completeCmd = &cobra.Command{
 	Short:   "Mark tasks as complete with the given ID or series of IDs",
 	Long:    "Allows you to marks a task or multiple tasks as complete by providing their IDs. You can get the ID by listing all tasks.",
 	Run: func(cmd *cobra.Command, args []string) {
+		all, _ := cmd.Flags().GetBool("all")
+
+		if all {
+			TodoList.CompleteAllTasks()
+			fmt.Println(config.SuccessStyle.Render("All tasks marked as completed"))
+			return
+		}
+
 		var tasksNotFound []string
 		var completedTasks []string
 		for _, arg := range args {
@@ -45,4 +53,5 @@ var completeCmd = &cobra.Command{
 }
 
 func init() {
+	completeCmd.Flags().BoolP("all", "a", false, "Mark all tasks as complete")
 }
