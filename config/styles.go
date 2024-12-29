@@ -12,7 +12,7 @@ var (
 			Foreground(lipgloss.Color(SuccessColor)).
 			Italic(true)
 
-	ErrorSytle = lipgloss.NewStyle().
+	ErrorStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color(ErrorColor))
 
 	InfoStyle = lipgloss.NewStyle().

@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/CDavidSV/go-todo-app/config"
 	"github.com/spf13/cobra"
@@ -11,22 +12,37 @@ import (
 var completeCmd = &cobra.Command{
 	Use:     "complete",
 	Aliases: []string{"c"},
-	Args:    cobra.ExactArgs(1),
-	Short:   "Mark a task as complete with the given ID",
-	Long:    "Marks a task as completed with the given ID, and removes it from the list of pending tasks.",
+	Args:    cobra.MinimumNArgs(1),
+	Short:   "Mark tasks as complete with the given ID or series of IDs",
+	Long:    "Allows you to marks a task or multiple tasks as complete by providing their IDs. You can get the ID by listing all tasks.",
 	Run: func(cmd *cobra.Command, args []string) {
-		taskID, err := strconv.Atoi(args[0])
-		if err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), config.ErrorSytle.Render("Invalid task ID: %s\n"), args[0])
+		var tasksNotFound []string
+		var completedTasks []string
+		for _, arg := range args {
+			taskID, err := strconv.Atoi(arg)
+			if err != nil {
+				fmt.Fprintf(cmd.ErrOrStderr(), config.ErrorStyle.Render("Invalid task ID: %s\n"), arg)
+				return
+			}
+
+			removed := TodoList.SetTaskCompletion(taskID, true)
+
+			if !removed {
+				tasksNotFound = append(tasksNotFound, arg)
+			} else {
+				completedTasks = append(completedTasks, arg)
+			}
 		}
 
-		removed := TodoList.CompleteTask(taskID)
-
-		if !removed {
-			fmt.Fprintf(cmd.ErrOrStderr(), config.WarningStyle.Render("Task not found: %d\n"), taskID)
-			return
+		if len(tasksNotFound) > 0 {
+			fmt.Println(config.WarningStyle.Render(fmt.Sprintf("No tasks found matching ID(s): %s", strings.Join(tasksNotFound, ", "))))
 		}
 
-		fmt.Println(config.SuccessStyle.Render("Task marked as completed"))
+		if len(tasksNotFound) != len(args) {
+			fmt.Println(config.SuccessStyle.Render(fmt.Sprintf("Task(s) %s marked as completed", strings.Join(completedTasks, ", "))))
+		}
 	},
+}
+
+func init() {
 }

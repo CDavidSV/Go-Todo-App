@@ -17,7 +17,7 @@ var removeCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		taskID, err := strconv.Atoi(args[0])
 		if err != nil {
-			fmt.Fprintf(cmd.ErrOrStderr(), config.ErrorSytle.Render("Invalid task ID: %s\n"), args[0])
+			fmt.Fprintf(cmd.ErrOrStderr(), config.ErrorStyle.Render("Invalid task ID: %s\n"), args[0])
 		}
 
 		if task, deleted := TodoList.RemoveTask(taskID); deleted {

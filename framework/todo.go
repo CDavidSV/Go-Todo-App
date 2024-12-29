@@ -125,7 +125,7 @@ func NewTodoList() *TodoList {
 
 	text, err := decompressString(fileBytes)
 	if err != nil {
-		log.Fatalf(config.ErrorSytle.Render("Error loading tasks, file may be corrupted: %v"), err)
+		log.Fatalf(config.ErrorStyle.Render("Error loading tasks, file may be corrupted: %v"), err)
 	}
 
 	// Load tasks from file
@@ -180,11 +180,11 @@ func (t *TodoList) RemoveTask(ID int) (Task, bool) {
 	return Task{}, false
 }
 
-func (t *TodoList) CompleteTask(ID int) bool {
+func (t *TodoList) SetTaskCompletion(ID int, completed bool) bool {
 	defer t.save()
 
 	if task, ok := t.tasks[ID]; ok {
-		task.Completed = true
+		task.Completed = completed
 		return true
 	}
 
@@ -232,19 +232,19 @@ func (t *TodoList) save() {
 
 	compressed, err := compressString(tasks)
 	if err != nil {
-		log.Fatalf(config.ErrorSytle.Render("error saving to file: %v"), err)
+		log.Fatalf(config.ErrorStyle.Render("error saving to file: %v"), err)
 	}
 
 	tempFilePath := defaultFilePath + ".tmp"
 	err = os.WriteFile(tempFilePath, compressed, 0644)
 	if err != nil {
 		os.Remove(tempFilePath)
-		log.Fatalf(config.ErrorSytle.Render("error saving to file: %v"), err)
+		log.Fatalf(config.ErrorStyle.Render("error saving to file: %v"), err)
 	}
 
 	err = os.Rename(tempFilePath, defaultFilePath)
 	if err != nil {
 		os.Remove(tempFilePath)
-		log.Fatalf(config.ErrorSytle.Render("error saving to file: %v"), err)
+		log.Fatalf(config.ErrorStyle.Render("error saving to file: %v"), err)
 	}
 }
