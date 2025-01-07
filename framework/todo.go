@@ -1,7 +1,6 @@
 package framework
 
 import (
-	"bytes"
 	"compress/gzip"
 	"encoding/csv"
 	"fmt"
@@ -84,22 +83,20 @@ func sortTasksByDate(tasks [][]string) {
 	})
 }
 
-func compressString(input string) ([]byte, error) {
-	var gzipBuff bytes.Buffer
-	gzipWriter := gzip.NewWriter(&gzipBuff)
+func compressFile(file *os.File, input string) error {
+	gzipWriter := gzip.NewWriter(file)
 
 	_, err := gzipWriter.Write([]byte(input))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	gzipWriter.Close()
 
-	return gzipBuff.Bytes(), nil
+	return nil
 }
 
-func decompressString(input []byte) (string, error) {
-	bytesBuffer := bytes.NewReader(input)
-	gzipReader, err := gzip.NewReader(bytesBuffer)
+func decompressFile(file *os.File) (string, error) {
+	gzipReader, err := gzip.NewReader(file)
 	if err != nil {
 		return "", err
 	}
@@ -117,13 +114,14 @@ func NewTodoList() *TodoList {
 		tasks: make(map[int]*Task),
 	}
 
-	fileBytes, err := os.ReadFile(defaultFilePath)
+	file, err := os.Open(defaultFilePath)
 	if err != nil {
 		// File does not exists or cannot be read
 		return todoList
 	}
+	defer file.Close()
 
-	text, err := decompressString(fileBytes)
+	text, err := decompressFile(file)
 	if err != nil {
 		log.Fatalf(config.ErrorStyle.Render("Error loading tasks, file may be corrupted: %v"), err)
 	}
@@ -237,22 +235,30 @@ func (t *TodoList) convertTasksToCSVFormat() string {
 
 func (t *TodoList) save() {
 	tasks := t.convertTasksToCSVFormat()
-
-	compressed, err := compressString(tasks)
-	if err != nil {
-		log.Fatalf(config.ErrorStyle.Render("error saving to file: %v"), err)
-	}
-
 	tempFilePath := defaultFilePath + ".tmp"
-	err = os.WriteFile(tempFilePath, compressed, 0644)
+
+	file, err := os.Create(tempFilePath)
 	if err != nil {
-		os.Remove(tempFilePath)
 		log.Fatalf(config.ErrorStyle.Render("error saving to file: %v"), err)
 	}
+
+	defer func() {
+		file.Close()
+		if err != nil {
+			os.Remove(tempFilePath)
+		}
+	}()
+
+	err = compressFile(file, tasks)
+	if err != nil {
+		log.Fatalf(config.ErrorStyle.Render("error saving to file: %v"), err)
+	}
+
+	// close the file before renaming
+	file.Close()
 
 	err = os.Rename(tempFilePath, defaultFilePath)
 	if err != nil {
-		os.Remove(tempFilePath)
 		log.Fatalf(config.ErrorStyle.Render("error saving to file: %v"), err)
 	}
 }
